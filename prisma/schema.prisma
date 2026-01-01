@@ -1,14 +1,152 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
+// ==============================
+// PRISMA SETUP
+// ==============================
 generator client {
   provider = "prisma-client"
-  output   = "../app/generated/prisma"
+  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// ==============================
+// ENUMS
+// ==============================
+enum Role {
+  USER
+  ADMIN
+}
+
+enum BetStatus {
+  PENDING
+  WON
+  LOST
+}
+
+enum TxnType {
+  CREDIT
+  DEBIT
+}
+
+enum TxnStatus {
+  SUCCESS
+  FAILED
+  PENDING
+}
+
+// ==============================
+// USER
+// ==============================
+model User {
+  id       String @id @default(uuid())
+  name     String
+  email    String @unique
+  password String
+  role     Role   @default(USER)
+
+  wallet Wallet?
+  bets   Bet[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+// ==============================
+// WALLET (1:1 WITH USER)
+// ==============================
+model Wallet {
+  id      String  @id @default(uuid())
+  balance Decimal @default(0) @db.Decimal(12, 2)
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  transactions Transaction[]
+
+  updatedAt DateTime @updatedAt
+
+  @@map("wallets")
+}
+
+// ==============================
+// GAME (AVIATOR, ETC.)
+// ==============================
+model Game {
+  id       String  @id @default(uuid())
+  name     String
+  slug     String  @unique
+  isActive Boolean @default(true)
+
+  minBet Decimal @db.Decimal(12, 2)
+  maxBet Decimal @db.Decimal(12, 2)
+  rtp    Float
+
+  bets Bet[]
+
+  createdAt DateTime @default(now())
+
+  @@index([slug])
+  @@map("games")
+}
+
+// ==============================
+// BET
+// ==============================
+model Bet {
+  id String @id @default(uuid())
+
+  amount     Decimal   @db.Decimal(12, 2)
+  multiplier Float
+  winAmount  Decimal?  @db.Decimal(12, 2)
+  status     BetStatus @default(PENDING)
+
+  userId String
+  gameId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([gameId])
+  @@index([status])
+  @@map("bets")
+}
+
+// ==============================
+// WALLET TRANSACTIONS
+// ==============================
+model Transaction {
+  id String @id @default(uuid())
+
+  amount Decimal   @db.Decimal(12, 2)
+  type   TxnType
+  status TxnStatus @default(SUCCESS)
+
+  walletId String
+  wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([walletId])
+  @@index([type])
+  @@map("transactions")
+}
+
+// ==============================
+// ADMIN SETTINGS (GLOBAL CONTROL)
+// ==============================
+model AdminSetting {
+  id String @id @default(uuid())
+
+  globalRtp      Float
+  isPlatformLive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@map("admin_settings")
 }
