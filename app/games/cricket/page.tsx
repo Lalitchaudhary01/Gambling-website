@@ -6,41 +6,49 @@ const OPTIONS = ["1", "2", "3", "4", "6", "WICKET"];
 
 export default function CricketGamePage() {
   const [amount, setAmount] = useState(100);
-  const [prediction, setPrediction] = useState<string>("6");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [prediction, setPrediction] = useState("6");
 
-  async function placeBet() {
-    setLoading(true);
-    setError(null);
+  const [bet, setBet] = useState(null); // active bet
+  const [result, setResult] = useState(null); // final result
+
+  const [adminMode] = useState(true); // always ON (local demo)
+
+  function placeBet() {
     setResult(null);
 
-    try {
-      const res = await fetch("/api/bets/cricket", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({
-          amount,
-          prediction,
-        }),
-      });
+    setBet({
+      prediction,
+      amount,
+      status: "PENDING",
+    });
+  }
 
-      const data = await res.json();
+  function adminForce(resultValue) {
+    if (!bet) return;
 
-      if (!data.success) {
-        setError(data.message);
-      } else {
-        setResult(data.data);
-      }
-    } catch (err) {
-      setError("Something went wrong");
-    } finally {
-      setLoading(false);
-    }
+    const isWin = bet.prediction === resultValue;
+
+    setResult({
+      result: resultValue,
+      isWin,
+      winAmount: isWin ? bet.amount * 2 : 0,
+      message: "Result set by admin (TEST MODE)",
+    });
+
+    setBet(null);
+  }
+
+  function adminCancel() {
+    if (!bet) return;
+
+    setResult({
+      result: "-",
+      isWin: false,
+      winAmount: 0,
+      message: "Bet cancelled by admin (TEST MODE)",
+    });
+
+    setBet(null);
   }
 
   return (
@@ -80,28 +88,60 @@ export default function CricketGamePage() {
           />
         </div>
 
-        {/* Bet Button */}
-        <button
-          onClick={placeBet}
-          disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 p-2 rounded font-semibold"
-        >
-          {loading ? "Placing Bet..." : "Place Bet"}
-        </button>
+        {/* Place Bet */}
+        {!bet && (
+          <button
+            onClick={placeBet}
+            className="w-full bg-blue-600 hover:bg-blue-700 p-2 rounded font-semibold"
+          >
+            Place Bet
+          </button>
+        )}
 
-        {/* Error */}
-        {error && (
-          <div className="bg-red-600/20 text-red-400 p-2 rounded">
-            ❌ {error}
+        {/* PENDING BET */}
+        {bet && (
+          <div className="bg-yellow-600/20 p-3 rounded space-y-2">
+            <p>⏳ Waiting for result…</p>
+            <p>
+              Prediction: <b>{bet.prediction}</b>
+            </p>
+            <p>Amount: ₹{bet.amount}</p>
           </div>
         )}
 
-        {/* Result */}
+        {/* ADMIN PANEL */}
+        {bet && adminMode && (
+          <div className="bg-gray-700 p-3 rounded space-y-2">
+            <p className="font-bold text-green-400">ADMIN PANEL (TEST)</p>
+
+            <p>
+              User predicted: <b>{bet.prediction}</b>
+            </p>
+
+            <div className="grid grid-cols-3 gap-2">
+              {OPTIONS.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => adminForce(opt)}
+                  className="bg-purple-600 hover:bg-purple-700 p-2 rounded"
+                >
+                  Force {opt}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={adminCancel}
+              className="w-full bg-red-600 hover:bg-red-700 p-2 rounded mt-2"
+            >
+              Cancel Bet
+            </button>
+          </div>
+        )}
+
+        {/* FINAL RESULT */}
         {result && (
           <div className="bg-gray-700 p-3 rounded space-y-1">
-            <p>
-              🎯 Prediction: <b>{prediction}</b>
-            </p>
             <p>
               🏏 Result: <b>{result.result}</b>
             </p>
@@ -111,6 +151,7 @@ export default function CricketGamePage() {
                 💰 Win Amount: <b>₹{result.winAmount}</b>
               </p>
             )}
+            <p className="text-yellow-400 text-sm">{result.message}</p>
           </div>
         )}
       </div>
